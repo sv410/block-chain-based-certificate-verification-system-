@@ -1,18 +1,24 @@
-import { sql } from "drizzle-orm";
-import { pgTable, text, varchar } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, timestamp, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
-export const users = pgTable("users", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  username: text("username").notNull().unique(),
-  password: text("password").notNull(),
+export const certificates = pgTable("certificates", {
+  id: serial("id").primaryKey(),
+  studentName: text("student_name").notNull(),
+  courseName: text("course_name").notNull(),
+  issuedBy: text("issued_by").notNull(),
+  issueDate: timestamp("issue_date").defaultNow(),
+  txHash: text("tx_hash").notNull(),
+  certificateHash: text("certificate_hash").notNull().unique(),
+  isRevoked: boolean("is_revoked").default(false).notNull(),
 });
 
-export const insertUserSchema = createInsertSchema(users).pick({
-  username: true,
-  password: true,
+export const insertCertificateSchema = createInsertSchema(certificates).omit({ 
+  id: true, 
+  issueDate: true,
+  txHash: true,
+  certificateHash: true
 });
 
-export type InsertUser = z.infer<typeof insertUserSchema>;
-export type User = typeof users.$inferSelect;
+export type InsertCertificate = z.infer<typeof insertCertificateSchema>;
+export type Certificate = typeof certificates.$inferSelect;

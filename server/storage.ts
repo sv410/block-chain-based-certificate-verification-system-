@@ -1,38 +1,43 @@
-import { type User, type InsertUser } from "@shared/schema";
-import { randomUUID } from "crypto";
-
-// modify the interface with any CRUD methods
-// you might need
+import { certificates, type InsertCertificate, type Certificate } from "@shared/schema";
+import { db } from "./db";
+import { eq } from "drizzle-orm";
+import crypto from "crypto";
 
 export interface IStorage {
-  getUser(id: string): Promise<User | undefined>;
-  getUserByUsername(username: string): Promise<User | undefined>;
-  createUser(user: InsertUser): Promise<User>;
+  getCertificates(): Promise<Certificate[]>;
+  getCertificateByHash(hash: string): Promise<Certificate | undefined>;
+  createCertificate(certificate: InsertCertificate): Promise<Certificate>;
 }
 
-export class MemStorage implements IStorage {
-  private users: Map<string, User>;
-
-  constructor() {
-    this.users = new Map();
+export class DatabaseStorage implements IStorage {
+  async getCertificates(): Promise<Certificate[]> {
+    return await db.select().from(certificates);
   }
 
-  async getUser(id: string): Promise<User | undefined> {
-    return this.users.get(id);
+  async getCertificateByHash(hash: string): Promise<Certificate | undefined> {
+    const [certificate] = await db.select().from(certificates).where(eq(certificates.certificateHash, hash));
+    return certificate;
   }
 
-  async getUserByUsername(username: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(
-      (user) => user.username === username,
-    );
-  }
+  async createCertificate(insertCertificate: InsertCertificate): Promise<Certificate> {
+    // Generate simulated blockchain data
+    const txHash = "0x" + crypto.randomBytes(32).toString("hex");
+    
+    // Create a deterministic hash for the certificate based on its contents and timestamp
+    const timestamp = new Date().getTime();
+    const dataToHash = `${insertCertificate.studentName}-${insertCertificate.courseName}-${insertCertificate.issuedBy}-${timestamp}`;
+    const certificateHash = crypto.createHash("sha256").update(dataToHash).digest("hex");
 
-  async createUser(insertUser: InsertUser): Promise<User> {
-    const id = randomUUID();
-    const user: User = { ...insertUser, id };
-    this.users.set(id, user);
-    return user;
+    const [certificate] = await db.insert(certificates)
+      .values({
+        ...insertCertificate,
+        txHash,
+        certificateHash,
+      })
+      .returning();
+      
+    return certificate;
   }
 }
 
-export const storage = new MemStorage();
+export const storage = new DatabaseStorage();
